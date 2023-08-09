@@ -8,6 +8,7 @@
  *
  */
 #include "ur_loader.hpp"
+#include "ur_memory_provider.hpp"
 
 namespace ur_loader {
 ///////////////////////////////////////////////////////////////////////////////
@@ -29,6 +30,29 @@ ur_result_t context_t::init() {
 
     if (forceIntercept || platforms.size() > 1) {
         intercept_enabled = true;
+    }
+
+    // create register UMF providers
+    uint32_t adapterCount = 0;
+    std::vector<ur_adapter_handle_t> adapters;
+    urAdapterGet(0, nullptr, &adapterCount);
+    adapters.resize(adapterCount);
+    urAdapterGet(adapterCount, adapters.data(), nullptr);
+    for (auto a : adapters) {
+
+        struct umf_memory_provider_ops_t ops = {
+            .version = UMF_VERSION_CURRENT,
+            .initialize = ur_initialize,
+            .finalize = ur_finalize,
+            .alloc = ur_alloc,
+            .free = ur_free,
+            .get_last_native_error = ur_get_last_native_error,
+            .get_min_page_size = ur_get_min_page_size,
+            .get_name = ur_get_name,
+            .supports_device = ur_supports_device,
+        };
+
+        umfMemoryProviderRegister(&ops);
     }
 
     return UR_RESULT_SUCCESS;
