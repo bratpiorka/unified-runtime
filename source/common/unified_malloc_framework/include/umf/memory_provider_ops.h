@@ -18,6 +18,8 @@
 extern "C" {
 #endif
 
+struct umf_memory_provider_config_t;
+
 /// This structure comprises function pointers used by corresponding
 /// umfMemoryProvider* calls. Each memory provider implementation should
 /// initialize all function pointers.
@@ -25,6 +27,8 @@ struct umf_memory_provider_ops_t {
     /// Version of the ops structure.
     /// Should be initialized using UMF_VERSION_CURRENT
     uint32_t version;
+
+    void *priv;
 
     ///
     /// \brief Initializes memory provider.
@@ -51,7 +55,7 @@ struct umf_memory_provider_ops_t {
     enum umf_result_t (*purge_lazy)(void *provider, void *ptr, size_t size);
     enum umf_result_t (*purge_force)(void *provider, void *ptr, size_t size);
     const char *(*get_name)(void *provider);
-    bool (*supports_device)(const char *name);
+    bool (*supports_device)(const struct umf_memory_provider_config_t *config);
 };
 
 #ifdef __cplusplus

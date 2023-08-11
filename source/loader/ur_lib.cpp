@@ -13,6 +13,8 @@
 #include "logger/ur_logger.hpp"
 #include "ur_loader.hpp"
 
+#include "ur_memory_provider.hpp"
+
 #include <cstring>
 
 namespace ur_lib {
@@ -74,6 +76,19 @@ context_t::Init(ur_device_init_flags_t device_flags,
     if (UR_RESULT_SUCCESS == result) {
         result = urInit();
     }
+
+    umf_memory_provider_ops_t ur_memory_provider_ops;
+    ur_memory_provider_ops.version = UMF_VERSION_CURRENT,
+    ur_memory_provider_ops.initialize = ur_initialize,
+    ur_memory_provider_ops.finalize = ur_finalize,
+    ur_memory_provider_ops.alloc = ur_alloc,
+    ur_memory_provider_ops.free = ur_free,
+    ur_memory_provider_ops.get_last_native_error = ur_get_last_native_error,
+    ur_memory_provider_ops.get_min_page_size = ur_get_min_page_size,
+    ur_memory_provider_ops.get_name = ur_get_name,
+    ur_memory_provider_ops.supports_device = ur_supports_device,
+
+    umfMemoryProviderRegister(UMF_DEVICE_TYPE_GPU, &ur_memory_provider_ops);
 
     if (hLoaderConfig) {
         enabledLayerNames.merge(hLoaderConfig->getEnabledLayerNames());

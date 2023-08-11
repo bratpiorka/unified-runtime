@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,12 @@ struct umf_memory_provider_t {
     void *provider_priv;
 };
 
-std::vector<struct umf_memory_provider_ops_t> globalProviders;
+// TODO here I use the ptr to vector because the system calls
+// globalProviders destructor twice - why?
+typedef std::pair<umf_device_type_t, struct umf_memory_provider_ops_t>
+    umf_provider_desc_pair_t;
+
+std::vector<umf_provider_desc_pair_t> *globalProviders;
 
 enum umf_result_t
 umfMemoryProviderCreate(const struct umf_memory_provider_ops_t *ops,
@@ -54,40 +60,43 @@ umfMemoryProviderCreate(const struct umf_memory_provider_ops_t *ops,
     return UMF_RESULT_SUCCESS;
 }
 
-enum umf_result_t umfMemoryProviderRegister(umf_memory_provider_ops_t *ops) {
+enum umf_result_t umfMemoryProviderRegister(umf_device_type_t type,
+                                            umf_memory_provider_ops_t *ops) {
+
+    if (globalProviders == NULL) {
+        // TODO this is never freed
+        globalProviders = new std::vector<umf_provider_desc_pair_t>;
+    }
 
     // TODO check if this provider isn't already registered
-    globalProviders.push_back(*ops);
+    globalProviders->push_back(std::make_pair(type, *ops));
 
     return UMF_RESULT_SUCCESS;
 }
 
-enum umf_result_t
-umfMemoryProvidersRegistryGet(umf_memory_provider_ops_t *providers,
-                              size_t *numProviders) {
-
-    if (providers == NULL) {
-        *numProviders = globalProviders.size();
-    } else {
-        memcpy(providers, globalProviders.data(),
-               sizeof(umf_memory_provider_ops_t) * *numProviders);
+enum umf_result_t umfMemoryProvidersCreateFromConfig(
+    const umf_memory_provider_config_t *config,
+    umf_memory_provider_handle_t *hProvider /* out */) {
+    if (globalProviders == NULL) {
+        return UMF_RESULT_ERROR_MEMORY_PROVIDER_SPECIFIC;
     }
 
-    return UMF_RESULT_SUCCESS;
-}
-
-// TODO rename ;)
-const umf_memory_provider_ops_t *umfMemoryProvidersRegistryGetOps(char *name) {
-    auto it = std::find_if(
-        std::begin(globalProviders), std::end(globalProviders),
-        [&](auto &ops) { return std::strcmp(ops.get_name(NULL), name) == 0; });
-
-    if (it != globalProviders.end()) {
-        return &(*it);
+    if (hProvider != NULL) {
+        return UMF_RESULT_ERROR_INVALID_ARGUMENT;
     }
 
-    // else
-    return NULL;
+    for (size_t i = 0; i < globalProviders->size(); i++) {
+        if (globalProviders->at(i).first == config->type &&
+            globalProviders->at(i).second.supports_device(config)) {
+            enum umf_result_t ret = umfMemoryProviderCreate(
+                &globalProviders->at(i).second, (void *)config, hProvider);
+            if (ret == UMF_RESULT_SUCCESS) {
+                return ret;
+            }
+        }
+    }
+
+    return UMF_RESULT_ERROR_MEMORY_PROVIDER_SPECIFIC;
 }
 
 void umfMemoryProviderDestroy(umf_memory_provider_handle_t hProvider) {

@@ -20,6 +20,29 @@ extern "C" {
 
 typedef struct umf_memory_provider_t *umf_memory_provider_handle_t;
 
+typedef enum umf_device_type_t {
+    UMF_DEVICE_TYPE_INVALID = -1,
+    UMF_DEVICE_TYPE_NUMA,
+    UMF_DEVICE_TYPE_GPU,
+} umf_device_type_t;
+
+typedef struct umf_memory_provider_config_t {
+    umf_device_type_t type;
+
+    union params {
+        struct {
+            // TODO
+            size_t id;
+        } numa;
+
+        struct {
+            char address[12]; // in format "0000:00:00.0"
+        } gpu;
+
+        // other partition types ...
+    } params;
+} umf_memory_provider_config_t;
+
 ///
 /// \brief Creates new memory provider.
 /// \param ops instance of umf_memory_provider_ops_t
@@ -39,14 +62,12 @@ void umfMemoryProviderDestroy(umf_memory_provider_handle_t hProvider);
 
 // TODO comment
 enum umf_result_t
-umfMemoryProviderRegister(struct umf_memory_provider_ops_t *ops);
+umfMemoryProviderRegister(umf_device_type_t type,
+                          struct umf_memory_provider_ops_t *ops);
 
-enum umf_result_t
-umfMemoryProvidersRegistryGet(struct umf_memory_provider_ops_t *providers,
-                              size_t *numProviders);
-
-const struct umf_memory_provider_ops_t *
-umfMemoryProvidersRegistryGetOps(char *name);
+enum umf_result_t umfMemoryProvidersCreateFromConfig(
+    const umf_memory_provider_config_t *config,
+    umf_memory_provider_handle_t *hProvider /* out */);
 
 ///
 /// \brief Allocates size bytes of uninitialized storage from memory provider
